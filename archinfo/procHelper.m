@@ -29,10 +29,10 @@ NSString* archInfo(pid_t pid) {
     
     size = sizeof(procInfo); //(re)set size
     
-    if(noErr != sysctl(mib, (u_int)length, &procInfo, &size, NULL, 0)) return(@"amd64"); //get proc info
+    if(noErr != sysctl(mib, (u_int)length, &procInfo, &size, NULL, 0)) return(@"arm64"); //get proc info
     
     //'P_TRANSLATED' set? set architecture to 'Intel'
-    return( (P_TRANSLATED == (P_TRANSLATED & procInfo.kp_proc.p_flag)) ? @"x86_64" : @"amd64");
+    return( (P_TRANSLATED == (P_TRANSLATED & procInfo.kp_proc.p_flag)) ? @"x86_64" : @"arm64");
     
   }
   
