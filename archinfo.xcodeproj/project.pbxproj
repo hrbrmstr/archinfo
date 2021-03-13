@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01B369A425FD38490064ACA1 /* libbsm.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 01C9201925FD0A3C0097CD09 /* libbsm.tbd */; };
 		01C9200B25FD06D20097CD09 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01C9200A25FD06D20097CD09 /* main.swift */; };
 		01C9201325FD07020097CD09 /* procHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 01C9201225FD07020097CD09 /* procHelper.m */; };
 /* End PBXBuildFile section */
@@ -38,6 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				01B369A425FD38490064ACA1 /* libbsm.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -269,7 +271,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 0.1.0;
 				DEVELOPMENT_TEAM = CBY22P58G8;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = /Users/hrbrmstr/Development/archinfo/archinfo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -294,7 +296,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 0.1.0;
 				DEVELOPMENT_TEAM = CBY22P58G8;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = /Users/hrbrmstr/Development/archinfo/archinfo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
