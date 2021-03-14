@@ -1,5 +1,6 @@
 # 0.2.0 • 2021-03-14
 - removed Xcode dependency
+- added codesigning option
 - added option for either columnar output or ndjson output
 
 # 0.1.0 • 2021-03-13
