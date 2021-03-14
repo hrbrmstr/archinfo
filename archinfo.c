@@ -1,14 +1,27 @@
+#include <unistd.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <mach/machine.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
 #define noErr 0
-#define VERSION "0.2.0"
+#define VERSION "0.3.0"
+#define SYSCTL_ERROR 1
 
 enum fmt { JSON=0, COLUMNS };
+
+static int maxArgumentSize = 0;
+
+typedef struct ProcInfo {
+  bool ok;
+  char *name;
+  char arch[10];  
+} procinfo;
+
 
 // arch_info() is due to the spelunking work of Patrick Wardle <https://www.patreon.com/posts/45121749>
 static char *arch_info(pid_t pid) {
@@ -51,37 +64,50 @@ static char *arch_info(pid_t pid) {
 
 }
 
-// The below is modified code from: <https://gist.github.com/s4y/1173880/9ea0ed9b8a55c23f10ecb67ce288e09f08d9d1e5>
-// and is Copyright (c) 2020 DeepTech, Inc. (MIT License).
-// 
-// The code below the standard way to do this and I originally only copied it due to some Objective-C components.
-// While those components are no longer in use, the ACK stays b/c I'm thankful I didn't have to write Objective-C
-// for the initial version :-)
+procinfo proc_info(pid_t pid) {
+ 
+  size_t size = maxArgumentSize;
+  procinfo p;
+
+  char* buffer = (char *)malloc(4096);
+
+  if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
+    
+    p.ok = TRUE;
+    p.name = buffer;
+    strncpy(p.arch, arch_info(pid), 10);
+
+  } else {
+    free(buffer);
+    p.ok = FALSE;
+  }
+
+  return(p);
+
+}
+
+void output_one(enum fmt output_type, pid_t pid, procinfo p) {
+  if (output_type == COLUMNS) {
+    printf("%7d %6s %s\n", pid, p.arch, p.name+sizeof(int));
+  } else if (output_type == JSON) {
+    printf("{\"pid\":%d,\"arch\":\"%s\",\"name\":\"%s\"}\n", pid, p.arch, p.name+sizeof(int));
+  }
+}
 
 int enumerate_processes(enum fmt output_type) {
-
-  static int maxArgumentSize = 0;
-  
-  if (maxArgumentSize == 0) {
-    size_t size = sizeof(maxArgumentSize);
-    if (sysctl((int[]) { CTL_KERN, KERN_ARGMAX }, 2, &maxArgumentSize, &size, NULL, 0) == -1) {
-      perror("sysctl argument size");
-      maxArgumentSize = 4096; // Default
-    }
-  }
 
   int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
   struct kinfo_proc *info;
   size_t length;
   int count;
 
-  if (sysctl(mib, 3, NULL, &length, NULL, 0) < 0) return(1);
+  if (sysctl(mib, 3, NULL, &length, NULL, 0) < 0) return(SYSCTL_ERROR);
 
-  if (!(info = malloc(length))) return(1);
+  if (!(info = malloc(length))) return(SYSCTL_ERROR);
 
   if (sysctl(mib, 3, info, &length, NULL, 0) < 0) {
     free(info);
-    return(1);
+    return(SYSCTL_ERROR);
   }
 
   count = (int)(length / sizeof(struct kinfo_proc));
@@ -92,20 +118,13 @@ int enumerate_processes(enum fmt output_type) {
 
     if (pid == 0) continue;
 
-    size_t size = maxArgumentSize;
+    procinfo p = proc_info(pid);
 
-    char* buffer = (char *)malloc(length);
-
-    if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
-      if (output_type == COLUMNS) {
-        printf("%7d %6s %s\n", pid, arch_info(pid), buffer+sizeof(int));
-      } else if (output_type == JSON) {
-        printf("{\"pid\":%d,\"arch\":\"%s\",\"name\":\"%s\"}\n", pid, arch_info(pid), buffer+sizeof(int));
-      }
+    if (p.ok) {
+      output_one(output_type, pid, p);
+      free(p.name);
     }
-    
-    free(buffer);
-
+      
   }
   
   free(info);
@@ -119,31 +138,92 @@ void help() {
   printf("archinfo %s\n", VERSION);
   printf("boB Rudis <bob@rud.is>\n");
   printf("\n");
-  printf("archinfo outputs a list of running processes with the architecture (x86_64/amd64)\n");
+  printf("archinfo outputs a list of running processes with architecture (x86_64/amd64) information\n");
   printf("\n");
   printf("USAGE:\n");
-  printf("    archinfo [FLAG]\n");
+  printf("    archinfo [--columns|--json] [--pid #]\n");
   printf("\n");
-  printf("FLAG:\n");
+  printf("FLAGS/OPTIONS:\n");
+  printf("    --columns         Output process list in columns (default)\n");
   printf("    --json            Output process list in ndjson\n");
-  printf("    --columns         Output process list in columns\n");
+  printf("    --pid #           Output process architecture info for the specified process\n");
   printf("    --help            Display this help text\n");
+
+}
+
+void init() {
+   
+  if (maxArgumentSize == 0) {
+    size_t size = sizeof(maxArgumentSize);
+    if (sysctl((int[]) { CTL_KERN, KERN_ARGMAX }, 2, &maxArgumentSize, &size, NULL, 0) == -1) {
+      perror("sysctl argument size");
+      maxArgumentSize = 4096; // Default
+    }
+  }
 
 }
 
 int main(int argc, char** argv) {
 
-  if (argc >= 2) {
-    if (strcmp("--json", argv[1]) == 0) {
-      return(enumerate_processes(JSON));      
-    } else if (strcmp("--columns", argv[1]) == 0) {
-      return(enumerate_processes(COLUMNS));
-    } else if (strcmp("--help", argv[1]) == 0) {
-      help();
-      return(0);
+  int c;
+  bool show_help = FALSE;
+  bool do_one = FALSE;
+  pid_t pid = -1;
+  enum fmt output_type = COLUMNS;
+
+  while(true) {
+
+    int this_option_optind = optind ? optind : 1;
+    int option_index = 0;
+
+    static struct option long_options[] = {
+      { "json",    no_argument,       0,  'j' },
+      { "columns", no_argument,       0,  'c' },
+      { "help",    no_argument,       0,  'h' },
+      { "pid",     required_argument, 0,  'p' },
+      { 0,         0,                 0,  0 }
+    };
+
+    c = getopt_long(argc, argv, "jchp:", long_options, &option_index);
+
+    if (c == -1) break;
+
+    switch(c) {
+
+      case 'p': do_one = TRUE; pid = atoi(optarg); break;
+      case 'h': show_help = TRUE; break;
+      case 'j': output_type = JSON; break;
+      case 'c': output_type = COLUMNS; break;
+
     }
-  } else {
-      return(enumerate_processes(COLUMNS));
+
   }
+
+  init();
+
+  // only show help if --help is in the arg list
+
+  if (show_help) {
+    help();
+    return(0);
+  }
+
+  // only do one process if --pid is in the arg list
+
+  if (do_one) {
+    if (pid > 0) {
+      procinfo p = proc_info(pid);
+      if (p.ok) {
+        output_one(output_type, pid, p);
+        free(p.name);
+        return(0);
+      }
+    }
+    return(SYSCTL_ERROR);
+  } 
+
+ // otherwise do them all
+
+  return(enumerate_processes(output_type));
 
 }

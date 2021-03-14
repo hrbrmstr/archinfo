@@ -6,6 +6,11 @@ archinfo:
 	$(CC) archinfo.c -o arm_app -target arm64-apple-macos11
 	lipo -create -output archinfo x86_app arm_app && rm x86_app arm_app
 
+leaks: archinfo
+	leaks --readonlyContent -atExit -- ./archinfo | grep LEAK: || true
+	leaks --readonlyContent -atExit -- ./archinfo --json | grep LEAK: || true
+	leaks --readonlyContent -atExit -- ./archinfo --json | grep LEAK: || true
+
 sign: archinfo
 	codesign --force --verify --verbose --sign ${IDENTITY} archinfo
 
@@ -13,5 +18,9 @@ clean:
 	rm -f archinfo
 
 test: archinfo
-	@./archinfo        | grep -q tccd     && echo "Columns: PASSED" || "Columns: FAILED"
-	@./archinfo --json | grep -q 'tccd"}' && echo "   JSON: PASSED" || "   JSON: FAILED"
+	@./archinfo           | grep -q tccd     && echo "Columns: PASSED (list)"           || echo "Columns: FAILED (list)"
+	@./archinfo --columns | grep -q tccd     && echo "Columns: PASSED (list, explicit)" || echo "Columns: FAILED (list, explicit)"
+	@./archinfo --json    | grep -q 'tccd"}' && echo "   JSON: PASSED (list)"           || echo "   JSON: FAILED (list)"
+	@(./archinfo           --pid `pgrep keyboardservicesd` | grep -q '64') && echo "Columns: PASSED (single)"           || echo "Columns: FAILED (single)"
+	@(./archinfo --columns --pid `pgrep keyboardservicesd` | grep -q '"}') && echo "Columns: PASSED (single, explicit)" || echo "Columns: FAILED (single, explicit)"
+	@(./archinfo --json    --pid `pgrep keyboardservicesd` | grep -q '"}') && echo "   JSON: PASSED (single)"           || echo "   JSON: FAILED (single)"
