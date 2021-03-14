@@ -6,7 +6,7 @@ Apple M1/Apple Silicon/arm64 macOS can run x86_64 programs via Rosetta and most 
 
 Activity Monitor can show the architecture, but command line tools such as `ps` and `top` do not due to Apple hiding the details of the proper `sysctl()` incantations necessary to get this info.
 
-Patrick Wardle reverse engineered Activity Monitor— <https://www.patreon.com/posts/45121749> — and I slapped that hack together with some code from Sydney San Martin — https://gist.github.com/s4y/1173880/9ea0ed9b8a55c23f10ecb67ce288e09f08d9d1e5 — into a nascent, bare-bones command line utility `archinfo`.
+Patrick Wardle reverse-engineered Activity Monitor — <https://www.patreon.com/posts/45121749> — and I slapped that hack into a bare-bones command line utility `archinfo`.
 
 It returns columnar output or JSON (via `--json`) — that will work nicely with `jq` — of running processes and their respective architectures.
 
@@ -25,6 +25,14 @@ $ archinfo
    5852 x86_64 /Applications/Tailscale.app/Contents/MacOS/Tailscale
    5849  arm64 /System/Library/CoreServices/TextInputSwitcher.app/Contents/MacOS/TextInputSwitcher
 ...
+```
+
+```bash
+$ archinfo --pid $(pgrep keyboardservicesd)
+  60298 x86_64 /usr/libexec/keyboardservicesd
+
+$ archinfo --json --pid $(pgrep keyboardservicesd)
+{"pid":60298,"arch":"x86_64","name":"/usr/libexec/keyboardservicesd"}
 ```
 
 ```
