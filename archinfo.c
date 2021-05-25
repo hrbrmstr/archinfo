@@ -9,10 +9,11 @@
 #include <sys/sysctl.h>
 
 #define noErr 0
-#define VERSION "0.3.0"
+#define VERSION "0.4.0"
 #define SYSCTL_ERROR 1
 
 enum fmt { JSON=0, COLUMNS };
+enum show { ALL=0, ARM64, X86_64 };
 
 static int maxArgumentSize = 0;
 
@@ -21,7 +22,6 @@ typedef struct ProcInfo {
   char *name;
   char arch[10];  
 } procinfo;
-
 
 // arch_info() is due to the spelunking work of Patrick Wardle <https://www.patreon.com/posts/45121749>
 static char *arch_info(pid_t pid) {
@@ -69,7 +69,7 @@ procinfo proc_info(pid_t pid) {
   size_t size = maxArgumentSize;
   procinfo p;
 
-  char* buffer = (char *)malloc(4096);
+  char* buffer = (char *)calloc(4096, sizeof(char));
 
   if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
     
@@ -94,7 +94,7 @@ void output_one(enum fmt output_type, pid_t pid, procinfo p) {
   }
 }
 
-int enumerate_processes(enum fmt output_type) {
+int enumerate_processes(enum fmt output_type, enum show to_show) {
 
   int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
   struct kinfo_proc *info;
@@ -121,7 +121,13 @@ int enumerate_processes(enum fmt output_type) {
     procinfo p = proc_info(pid);
 
     if (p.ok) {
-      output_one(output_type, pid, p);
+      if (
+           (to_show == ALL) || 
+           ((to_show == ARM64) && !strncmp("arm", p.arch, 3)) || 
+           ((to_show == X86_64) && !strncmp("x86", p.arch, 3))
+         ) {
+        output_one(output_type, pid, p);
+      }
       free(p.name);
     }
       
@@ -141,9 +147,11 @@ void help() {
   printf("archinfo outputs a list of running processes with architecture (x86_64/amd64) information\n");
   printf("\n");
   printf("USAGE:\n");
-  printf("    archinfo [--columns|--json] [--pid #]\n");
+  printf("    archinfo [--arm|--x86] [--columns|--json] [--pid #]\n");
   printf("\n");
   printf("FLAGS/OPTIONS:\n");
+  printf("    --arm             Only show arm64 processes (default is to show both)\n");
+  printf("    --x86             Only show x86_64 processes  (default is to show both)\n");
   printf("    --columns         Output process list in columns (default)\n");
   printf("    --json            Output process list in ndjson\n");
   printf("    --pid #           Output process architecture info for the specified process\n");
@@ -166,6 +174,7 @@ void init() {
 int main(int argc, char** argv) {
 
   int c;
+  enum show to_show = ALL;
   bool show_help = FALSE;
   bool do_one = FALSE;
   pid_t pid = -1;
@@ -177,6 +186,8 @@ int main(int argc, char** argv) {
     int option_index = 0;
 
     static struct option long_options[] = {
+      { "arm",     no_argument,       0,  'a' },
+      { "x86",     no_argument,       0,  'x' },
       { "json",    no_argument,       0,  'j' },
       { "columns", no_argument,       0,  'c' },
       { "help",    no_argument,       0,  'h' },
@@ -184,12 +195,14 @@ int main(int argc, char** argv) {
       { 0,         0,                 0,  0 }
     };
 
-    c = getopt_long(argc, argv, "jchp:", long_options, &option_index);
+    c = getopt_long(argc, argv, "axjchp:", long_options, &option_index);
 
     if (c == -1) break;
 
     switch(c) {
 
+      case 'a': to_show = ARM64; break;
+      case 'x': to_show = X86_64; break;
       case 'p': do_one = TRUE; pid = atoi(optarg); break;
       case 'h': show_help = TRUE; break;
       case 'j': output_type = JSON; break;
@@ -224,6 +237,6 @@ int main(int argc, char** argv) {
 
  // otherwise do them all
 
-  return(enumerate_processes(output_type));
+  return(enumerate_processes(output_type, to_show));
 
 }

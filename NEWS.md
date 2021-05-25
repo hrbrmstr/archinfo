@@ -1,3 +1,5 @@
+* 0.4.0 • 2021-05-25
+- added options for only showing X86_64 or ARM64 processes
 # 0.3.0 • 2021-03-14
 - added option for retrieving process info for a single pid
 - added more tests
