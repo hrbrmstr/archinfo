@@ -103,7 +103,7 @@ int enumerate_processes(enum fmt output_type, enum show to_show) {
 
   if (sysctl(mib, 3, NULL, &length, NULL, 0) < 0) return(SYSCTL_ERROR);
 
-  if (!(info = malloc(length))) return(SYSCTL_ERROR);
+  if (!(info = calloc(length, sizeof(char)))) return(SYSCTL_ERROR);
 
   if (sysctl(mib, 3, info, &length, NULL, 0) < 0) {
     free(info);
@@ -123,8 +123,8 @@ int enumerate_processes(enum fmt output_type, enum show to_show) {
     if (p.ok) {
       if (
            (to_show == ALL) || 
-           ((to_show == ARM64) && !strncmp("arm", p.arch, 3)) || 
-           ((to_show == X86_64) && !strncmp("x86", p.arch, 3))
+           ((to_show == ARM64) && (strncmp("arm", p.arch, 3) == 0)) || 
+           ((to_show == X86_64) && (strncmp("x86", p.arch, 3) == 0))
          ) {
         output_one(output_type, pid, p);
       }
