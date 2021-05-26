@@ -7,6 +7,7 @@
 #include <mach/machine.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#include <libgen.h>
 
 #define noErr 0
 #define VERSION "0.4.0"
@@ -68,8 +69,14 @@ procinfo proc_info(pid_t pid) {
  
   size_t size = maxArgumentSize;
   procinfo p;
+  int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
+  struct kinfo_proc *info;
+  size_t length;
+  int count;
 
-  char* buffer = (char *)calloc(4096, sizeof(char));
+  (void)sysctl(mib, 3, NULL, &length, NULL, 0);
+
+  char* buffer = (char *)calloc(length, sizeof(char));
 
   if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
     
@@ -86,15 +93,25 @@ procinfo proc_info(pid_t pid) {
 
 }
 
-void output_one(enum fmt output_type, pid_t pid, procinfo p) {
+void output_one(enum fmt output_type, pid_t pid, procinfo p, bool only_basename) {
   if (output_type == COLUMNS) {
-    printf("%7d %6s %s\n", pid, p.arch, p.name+sizeof(int));
+    printf(
+      "%7d %6s %s\n", 
+      pid,
+      p.arch, 
+      (only_basename ? basename((char *)(p.name+sizeof(int))) : p.name+sizeof(int))
+    );
   } else if (output_type == JSON) {
-    printf("{\"pid\":%d,\"arch\":\"%s\",\"name\":\"%s\"}\n", pid, p.arch, p.name+sizeof(int));
+    printf(
+      "{\"pid\":%d,\"arch\":\"%s\",\"name\":\"%s\"}\n", 
+      pid, 
+      p.arch, 
+      (only_basename ? basename((char *)(p.name+sizeof(int))) : p.name+sizeof(int))
+    );
   }
 }
 
-int enumerate_processes(enum fmt output_type, enum show to_show) {
+int enumerate_processes(enum fmt output_type, enum show to_show, bool only_basename) {
 
   int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
   struct kinfo_proc *info;
@@ -126,7 +143,7 @@ int enumerate_processes(enum fmt output_type, enum show to_show) {
            ((to_show == ARM64) && (strncmp("arm", p.arch, 3) == 0)) || 
            ((to_show == X86_64) && (strncmp("x86", p.arch, 3) == 0))
          ) {
-        output_one(output_type, pid, p);
+        output_one(output_type, pid, p, only_basename);
       }
       free(p.name);
     }
@@ -147,11 +164,12 @@ void help() {
   printf("archinfo outputs a list of running processes with architecture (x86_64/amd64) information\n");
   printf("\n");
   printf("USAGE:\n");
-  printf("    archinfo [--arm|--x86] [--columns|--json] [--pid #]\n");
+  printf("    archinfo [--arm|--x86] [--basename] [--columns|--json] [--pid #]\n");
   printf("\n");
   printf("FLAGS/OPTIONS:\n");
   printf("    --arm             Only show arm64 processes (default is to show both)\n");
   printf("    --x86             Only show x86_64 processes  (default is to show both)\n");
+  printf("    --basename        Only show basename of process executable\n");
   printf("    --columns         Output process list in columns (default)\n");
   printf("    --json            Output process list in ndjson\n");
   printf("    --pid #           Output process architecture info for the specified process\n");
@@ -177,6 +195,7 @@ int main(int argc, char** argv) {
   enum show to_show = ALL;
   bool show_help = FALSE;
   bool do_one = FALSE;
+  bool only_basename = FALSE;
   pid_t pid = -1;
   enum fmt output_type = COLUMNS;
 
@@ -186,16 +205,17 @@ int main(int argc, char** argv) {
     int option_index = 0;
 
     static struct option long_options[] = {
-      { "arm",     no_argument,       0,  'a' },
-      { "x86",     no_argument,       0,  'x' },
-      { "json",    no_argument,       0,  'j' },
-      { "columns", no_argument,       0,  'c' },
-      { "help",    no_argument,       0,  'h' },
-      { "pid",     required_argument, 0,  'p' },
-      { 0,         0,                 0,  0 }
+      { "arm",      no_argument,       0,  'a' },
+      { "x86",      no_argument,       0,  'x' },
+      { "basename", no_argument,       0,  'b' },
+      { "json",     no_argument,       0,  'j' },
+      { "columns",  no_argument,       0,  'c' },
+      { "help",     no_argument,       0,  'h' },
+      { "pid",      required_argument, 0,  'p' },
+      { 0,          0,                 0,  0 }
     };
 
-    c = getopt_long(argc, argv, "axjchp:", long_options, &option_index);
+    c = getopt_long(argc, argv, "axbjchp:", long_options, &option_index);
 
     if (c == -1) break;
 
@@ -203,6 +223,7 @@ int main(int argc, char** argv) {
 
       case 'a': to_show = ARM64; break;
       case 'x': to_show = X86_64; break;
+      case 'b': only_basename = TRUE; break;
       case 'p': do_one = TRUE; pid = atoi(optarg); break;
       case 'h': show_help = TRUE; break;
       case 'j': output_type = JSON; break;
@@ -227,7 +248,7 @@ int main(int argc, char** argv) {
     if (pid > 0) {
       procinfo p = proc_info(pid);
       if (p.ok) {
-        output_one(output_type, pid, p);
+        output_one(output_type, pid, p, only_basename);
         free(p.name);
         return(0);
       }
@@ -237,6 +258,6 @@ int main(int argc, char** argv) {
 
  // otherwise do them all
 
-  return(enumerate_processes(output_type, to_show));
+  return(enumerate_processes(output_type, to_show, only_basename));
 
 }

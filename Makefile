@@ -17,6 +17,11 @@ sign: archinfo
 clean:
 	rm -f archinfo
 
+install: archinfo
+	codesign --force --verify --verbose --sign ${IDENTITY} archinfo
+	cp archinfo /usr/local/bin
+
+
 test: archinfo
 	@./archinfo           | grep -q tccd     && echo "Columns: PASSED (list)"           || echo "Columns: FAILED (list)"
 	@./archinfo --columns | grep -q tccd     && echo "Columns: PASSED (list, explicit)" || echo "Columns: FAILED (list, explicit)"
