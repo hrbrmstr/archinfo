@@ -27,5 +27,5 @@ test: archinfo
 	@./archinfo --columns | grep -q tccd     && echo "Columns: PASSED (list, explicit)" || echo "Columns: FAILED (list, explicit)"
 	@./archinfo --json    | grep -q 'tccd"}' && echo "   JSON: PASSED (list)"           || echo "   JSON: FAILED (list)"
 	@(./archinfo           --pid `pgrep keyboardservicesd` | grep -q '64') && echo "Columns: PASSED (single)"           || echo "Columns: FAILED (single)"
-	@(./archinfo --columns --pid `pgrep keyboardservicesd` | grep -q '"}') && echo "Columns: PASSED (single, explicit)" || echo "Columns: FAILED (single, explicit)"
+	@(./archinfo --columns --pid `pgrep keyboardservicesd` | grep -q '64') && echo "Columns: PASSED (single, explicit)" || echo "Columns: FAILED (single, explicit)"
 	@(./archinfo --json    --pid `pgrep keyboardservicesd` | grep -q '"}') && echo "   JSON: PASSED (single)"           || echo "   JSON: FAILED (single)"

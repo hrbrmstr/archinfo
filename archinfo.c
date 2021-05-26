@@ -9,14 +9,18 @@
 #include <sys/sysctl.h>
 #include <libgen.h>
 
-#define noErr 0
 #define VERSION "0.4.0"
+
+#define noErr 0
+#define DEFAULT_BUFFER_SIZE 4096
 #define SYSCTL_ERROR 1
+
+#define is_match(x) (x == 0)
 
 enum fmt { JSON=0, COLUMNS };
 enum show { ALL=0, ARM64, X86_64 };
 
-static int maxArgumentSize = 0;
+static int max_arg_size = 0;
 
 typedef struct ProcInfo {
   bool ok;
@@ -56,7 +60,7 @@ static char *arch_info(pid_t pid) {
     
     if(noErr != sysctl(mib, (u_int)length, &procInfo, &size, NULL, 0)) return("arm64"); //get proc info
     
-    //'P_TRANSLATED' set? set architecture to 'Intel'
+    //'P_TRANSLATED' set? set architecture to 'x86_64'
     return( (P_TRANSLATED == (P_TRANSLATED & procInfo.kp_proc.p_flag)) ? "x86_64" : "arm64");
     
   }
@@ -65,21 +69,26 @@ static char *arch_info(pid_t pid) {
 
 }
 
+// retrieve process info
+
 procinfo proc_info(pid_t pid) {
  
-  size_t size = maxArgumentSize;
+  size_t size = max_arg_size;
   procinfo p;
   int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
   struct kinfo_proc *info;
   size_t length;
   int count;
 
+  // get size for buffer
   (void)sysctl(mib, 3, NULL, &length, NULL, 0);
 
   char* buffer = (char *)calloc(length, sizeof(char));
 
+  // get the info
   if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
     
+    // copy the info
     p.ok = TRUE;
     p.name = buffer;
     strncpy(p.arch, arch_info(pid), 10);
@@ -92,6 +101,8 @@ procinfo proc_info(pid_t pid) {
   return(p);
 
 }
+
+// output one line of process info with architecture info
 
 void output_one(enum fmt output_type, pid_t pid, procinfo p, bool only_basename) {
   if (output_type == COLUMNS) {
@@ -111,6 +122,9 @@ void output_one(enum fmt output_type, pid_t pid, procinfo p, bool only_basename)
   }
 }
 
+// walk through process list, get PID and name, then pass that on to output_one() to
+// grab the architecture and do the actual output
+
 int enumerate_processes(enum fmt output_type, enum show to_show, bool only_basename) {
 
   int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
@@ -118,30 +132,35 @@ int enumerate_processes(enum fmt output_type, enum show to_show, bool only_basen
   size_t length;
   int count;
 
+  // get the running process list
   if (sysctl(mib, 3, NULL, &length, NULL, 0) < 0) return(SYSCTL_ERROR);
 
+  // make some room for results
   if (!(info = calloc(length, sizeof(char)))) return(SYSCTL_ERROR);
 
+  // get the results
   if (sysctl(mib, 3, info, &length, NULL, 0) < 0) {
     free(info);
     return(SYSCTL_ERROR);
   }
 
+  // how many results?
   count = (int)(length / sizeof(struct kinfo_proc));
   
+  // for each result
   for (int i = 0; i < count; i++) {
 
-    pid_t pid = info[i].kp_proc.p_pid;
+    pid_t pid = info[i].kp_proc.p_pid; // get PID
 
     if (pid == 0) continue;
 
-    procinfo p = proc_info(pid);
+    procinfo p = proc_info(pid); // get process info
 
     if (p.ok) {
       if (
            (to_show == ALL) || 
-           ((to_show == ARM64) && (strncmp("arm", p.arch, 3) == 0)) || 
-           ((to_show == X86_64) && (strncmp("x86", p.arch, 3) == 0))
+           ((to_show == ARM64) && is_match(strncmp("arm", p.arch, 3))) || 
+           ((to_show == X86_64) && is_match(strncmp("x86", p.arch, 3)))
          ) {
         output_one(output_type, pid, p, only_basename);
       }
@@ -155,6 +174,8 @@ int enumerate_processes(enum fmt output_type, enum show to_show, bool only_basen
   return(0);
 
 }
+
+// call to display cmdline tool help
 
 void help() {
 
@@ -179,11 +200,11 @@ void help() {
 
 void init() {
    
-  if (maxArgumentSize == 0) {
-    size_t size = sizeof(maxArgumentSize);
-    if (sysctl((int[]) { CTL_KERN, KERN_ARGMAX }, 2, &maxArgumentSize, &size, NULL, 0) == -1) {
+  if (max_arg_size == 0) {
+    size_t size = sizeof(max_arg_size);
+    if (sysctl((int[]) { CTL_KERN, KERN_ARGMAX }, 2, &max_arg_size, &size, NULL, 0) == -1) {
       perror("sysctl argument size");
-      maxArgumentSize = 4096; // Default
+      max_arg_size = DEFAULT_BUFFER_SIZE;
     }
   }
 
