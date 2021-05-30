@@ -75,7 +75,7 @@ procinfo proc_info(pid_t pid) {
  
   size_t size = max_arg_size;
   procinfo p;
-  int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
+  int mib[3] = { CTL_KERN, KERN_PROCARGS2, pid };
   struct kinfo_proc *info;
   size_t length;
   int count;
@@ -83,10 +83,10 @@ procinfo proc_info(pid_t pid) {
   // get size for buffer
   (void)sysctl(mib, 3, NULL, &length, NULL, 0);
 
-  char* buffer = (char *)calloc(length, sizeof(char));
+  char* buffer = (char *)calloc(length+32, sizeof(char)); // need +32 b/c this is busted on Big Sur
 
   // get the info
-  if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
+  if (sysctl(mib, 3, buffer, &size, NULL, 0) == 0) {
     
     // copy the info
     p.ok = TRUE;
