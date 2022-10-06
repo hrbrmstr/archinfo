@@ -36,7 +36,7 @@ $ archinfo --json --pid $(pgrep keyboardservicesd)
 ```
 
 ```
-archinfo --json | jq -r --slurp 'group_by(.arch)[] | {arch: .[0].arch, count: length } | [ .arch, .count ] | @tsv'
+archinfo --json | jq -r --slurp 'group_by(.arch)[] | { arch: .[0].arch, count: length } | [ .arch, .count ] | @tsv'
 ## arm64   382
 ## x86_64  12
 ```
