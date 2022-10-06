@@ -1,5 +1,5 @@
 # replace this with yours if you want to codesign your own binary
-IDENTITY="Apple Development: Bob Rudis (9V3BZ2VH79)"
+IDENTITY="CBY22P58G8"
 
 archinfo:
 	$(CC) archinfo.c -o x86_app -target x86_64-apple-macos10.12

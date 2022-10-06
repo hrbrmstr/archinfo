@@ -36,8 +36,7 @@ $ archinfo --json --pid $(pgrep keyboardservicesd)
 ```
 
 ```
-Rscript -e 'table(jsonlite::stream_in(textConnection(system("/usr/local/bin/archinfo --json", intern=TRUE)))$arch)'
-##
-## arm64 x86_64
-##   419     29
+archinfo --json | jq -r --slurp 'group_by(.arch)[] | {arch: .[0].arch, count: length } | [ .arch, .count ] | @tsv'
+## arm64   382
+## x86_64  12
 ```
