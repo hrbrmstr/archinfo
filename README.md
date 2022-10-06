@@ -10,7 +10,15 @@ Patrick Wardle reverse-engineered Activity Monitor — <https://www.patreon.com/
 
 It returns columnar output or JSON (via `--json`) — that will work nicely with `jq` — of running processes and their respective architectures.
 
-Build from source or grab from the releases.
+## Installation
+
+Build from source, grab from the releases, or use `homebrew`:
+
+```bash
+brew install hrbrmstr/tap/archinfo
+```
+
+## Usage
 
 ```bash
 $ archinfo
@@ -35,7 +43,7 @@ $ archinfo --json --pid $(pgrep keyboardservicesd)
 {"pid":60298,"arch":"x86_64","name":"/usr/libexec/keyboardservicesd"}
 ```
 
-```
+```bash
 archinfo --json | jq -r --slurp 'group_by(.arch)[] | { arch: .[0].arch, count: length } | [ .arch, .count ] | @tsv'
 ## arm64   382
 ## x86_64  12
